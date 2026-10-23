@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPA Calculator</title>
+  <style>
+    /* ---------- 1. Page appearance (CSS) ---------- */
+    :root {
+      --blue: #2457c5;
+      --blue-dark: #19439d;
+      --ink: #1f2937;
+      --muted: #667085;
+      --line: #dce3ed;
+      --page: #f4f7fb;
+      --white: #ffffff;
+      --red: #b42318;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 28px 16px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header { margin-bottom: 22px; }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+    }
+
+    h2 { margin: 0 0 12px; font-size: 1.25rem; }
+    h3 { margin: 18px 0 8px; font-size: 1rem; }
+    p { margin: 8px 0; }
+    .subtitle, .muted { color: var(--muted); }
+
+    .panel {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 14px rgba(20, 40, 80, 0.04);
+    }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .course-table { min-width: 650px; }
+
+    th, td {
+      padding: 11px 9px;
+      text-align: left;
+      border-bottom: 1px solid #edf0f5;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.83rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    input, select {
+      width: 100%;
+      min-width: 76px;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: white;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input:focus, select:focus, button:focus-visible {
+      outline: 3px solid rgba(36, 87, 197, 0.2);
+      outline-offset: 1px;
+    }
+
+    .course-name { min-width: 150px; }
+    .grade-select { min-width: 100px; }
+    .points-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary { color: white; background: var(--blue); }
+    .primary:hover { background: var(--blue-dark); }
+    .secondary { color: var(--blue); background: #edf3ff; }
+    .secondary:hover { background: #e0eaff; }
+    .delete { color: var(--red); background: #fff0ef; padding: 8px 10px; }
+    .delete:hover { background: #ffe2df; }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .summary-card {
+      background: #f8faff;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 16px;
+    }
+
+    .summary-label { color: var(--muted); font-size: 0.9rem; }
+    .summary-number {
+      margin-top: 3px;
+      font-size: 1.9rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .formula {
+      margin-top: 12px;
+      padding: 14px;
+      background: #f3f6fc;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 8px 8px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .formula strong { display: block; margin-bottom: 6px; }
+    .example { font-family: "Courier New", monospace; }
+    .empty { padding: 22px 8px; color: var(--muted); text-align: center; }
+    .notice { color: var(--red); margin-top: 10px; }
+    .small { font-size: 0.9rem; }
+
+    @media (max-width: 650px) {
+      body { padding: 16px 10px; }
+      .panel { padding: 14px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .summary-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+      .summary-number { margin-top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>GPA Calculator</h1>
+      <p class="subtitle">Enter your classes, choose your grades, and add credit hours. Your GPA updates automatically.</p>
+    </header>
+
+    <!-- ---------- 2. Input table ---------- -->
+    <section class="panel" aria-labelledby="classes-title">
+      <h2 id="classes-title">1. Enter your classes</h2>
+      <p class="muted small">Grade points are filled in automatically when you select a letter grade.</p>
+
+      <div class="table-scroll">
+        <table class="course-table">
+          <thead>
+            <tr>
+              <th scope="col">Class name</th>
+              <th scope="col">Letter grade</th>
+              <th scope="col">Grade points</th>
+              <th scope="col">Credit hours</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody id="courseRows">
+            <!-- JavaScript creates class rows here. -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="button-row">
+        <button type="button" class="primary" id="addButton">+ Add class</button>
+        <button type="button" class="secondary" id="clearButton">Clear all classes</button>
+      </div>
+      <p id="notice" class="notice small" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ---------- 3. Calculated results ---------- -->
+    <section class="panel" aria-labelledby="results-title">
+      <h2 id="results-title">2. GPA results</h2>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Calculated GPA</div>
+          <div class="summary-number" id="gpa">0.00</div>
+          <div class="muted small">Out of 4.00</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total credit hours</div>
+          <div class="summary-number" id="credits">0</div>
+          <div class="muted small">Valid classes only</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total weighted points</div>
+          <div class="summary-number" id="weightedPoints">0.00</div>
+          <div class="muted small">Grade points × credits</div>
+        </div>
+      </div>
+
+      <h3>Calculation for your entered classes</h3>
+      <div class="formula">
+        <strong>GPA = Total weighted grade points ÷ Total credit hours</strong>
+        <div id="calculation" class="example">Add a class with valid credit hours to see the calculation.</div>
+      </div>
+    </section>
+
+    <!-- ---------- 4. Explain the math ---------- -->
+    <section class="panel" aria-labelledby="how-title">
+      <h2 id="how-title">3. How the GPA is calculated</h2>
+      <ol>
+        <li>Convert each letter grade to grade points.</li>
+        <li>Multiply each class's grade points by its credit hours.</li>
+        <li>Add all the weighted points together.</li>
+        <li>Divide the weighted-point total by the total credit hours.</li>
+      </ol>
+
+      <h3>Grade scale used in this calculator</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">Letter grade</th><th scope="col">Grade points</th><th scope="col">Example for a 3-credit class</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>4.0</td><td>4.0 × 3 = 12 weighted points</td></tr>
+            <tr><td>B</td><td>3.0</td><td>3.0 × 3 = 9 weighted points</td></tr>
+            <tr><td>C</td><td>2.0</td><td>2.0 × 3 = 6 weighted points</td></tr>
+            <tr><td>D</td><td>1.0</td><td>1.0 × 3 = 3 weighted points</td></tr>
+            <tr><td>F</td><td>0.0</td><td>0.0 × 3 = 0 weighted points</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted small">Note: This uses a common 4.0 scale (without plus/minus grades). Your school may use a different scale or special rules for repeated, pass/fail, or withdrawn classes.</p>
+    </section>
+  </main>
+
+  <script>
+    // ---------- 5. Grade scale ----------
+    // The selected letter grade is converted using this object.
+    const gradeScale = {
+      A: 4.0,
+      B: 3.0,
+      C: 2.0,
+      D: 1.0,
+      F: 0.0
+    };
+
+    // Find important elements in the HTML so JavaScript can update them.
+    const courseRows = document.getElementById("courseRows");
+    const gpaOutput = document.getElementById("gpa");
+    const creditsOutput = document.getElementById("credits");
+    const weightedPointsOutput = document.getElementById("weightedPoints");
+    const calculationOutput = document.getElementById("calculation");
+    const notice = document.getElementById("notice");
+
+    // ---------- 6. Add a class row ----------
+    function addClass(className = "", grade = "A", credits = "3") {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td><input class="course-name" type="text" placeholder="e.g. Biology" aria-label="Class name"></td>
+        <td>
+          <select class="grade-select" aria-label="Letter grade">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="F">F</option>
+          </select>
+        </td>
+        <td class="points-cell">4.0</td>
+        <td><input class="credit-input" type="number" min="0.5" max="30" step="0.5" aria-label="Credit hours"></td>
+        <td><button class="delete" type="button">Delete</button></td>
+      `;
+
+      // Set the starting values for this row.
+      row.querySelector(".course-name").value = className;
+      row.querySelector(".grade-select").value = grade;
+      row.querySelector(".credit-input").value = credits;
+
+      const gradeSelect = row.querySelector(".grade-select");
+      const creditInput = row.querySelector(".credit-input");
+
+      // When the grade changes, show its point value and recalculate.
+      gradeSelect.addEventListener("change", () => {
+        showGradePoints(row);
+        calculateGPA();
+      });
+
+      // Recalculate when credit hours are edited.
+      creditInput.addEventListener("input", calculateGPA);
+
+      // The class name is not part of the math, but keep the UI responsive.
+      row.querySelector(".course-name").addEventListener("input", calculateGPA);
+
+      // Delete just this class row.
+      row.querySelector(".delete").addEventListener("click", () => {
+        row.remove();
+        calculateGPA();
+      });
+
+      courseRows.appendChild(row);
+      showGradePoints(row);
+      calculateGPA();
+    }
+
+    // ---------- 7. Show the selected grade's point value ----------
+    function showGradePoints(row) {
+      const grade = row.querySelector(".grade-select").value;
+      row.querySelector(".points-cell").textContent = gradeScale[grade].toFixed(1);
+    }
+
+    // ---------- 8. Calculate GPA ----------
+    function calculateGPA() {
+      let totalCredits = 0;
+      let totalWeightedPoints = 0;
+      let hasInvalidCredits = false;
+      const mathParts = [];
+
+      // Look at every class currently in the table.
+      const rows = courseRows.querySelectorAll("tr");
+
+      rows.forEach((row) => {
+        const grade = row.querySelector(".grade-select").value;
+        const creditText = row.querySelector(".credit-input").value.trim();
+        const credits = Number(creditText);
+
+        // Ignore blank, zero, negative, or overly large credit values.
+        if (creditText === "" || !Number.isFinite(credits) || credits <= 0 || credits > 30) {
+          if (creditText !== "" && (credits <= 0 || credits > 30 || !Number.isFinite(credits))) {
+            hasInvalidCredits = true;
+          }
+          return;
+        }
+
+        const gradePoints = gradeScale[grade];
+        const weightedPoints = gradePoints * credits;
+
+        totalCredits += credits;
+        totalWeightedPoints += weightedPoints;
+
+        // Save each part so the user can see how the total was made.
+        mathParts.push(`(${gradePoints.toFixed(1)} × ${credits})`);
+      });
+
+      // The GPA is a weighted average, not just an average of letter grades.
+      const gpa = totalCredits === 0 ? 0 : totalWeightedPoints / totalCredits;
+
+      // Update the three result cards.
+      gpaOutput.textContent = gpa.toFixed(2);
+      creditsOutput.textContent = Number.isInteger(totalCredits)
+        ? String(totalCredits)
+        : totalCredits.toFixed(1);
+      weightedPointsOutput.textContent = totalWeightedPoints.toFixed(2);
+
+      // Show the exact formula using the current inputs.
+      if (totalCredits > 0) {
+        calculationOutput.textContent =
+          `${mathParts.join(" + ")} = ${totalWeightedPoints.toFixed(2)} weighted points; ` +
+          `${totalWeightedPoints.toFixed(2)} ÷ ${totalCredits} credits = ${gpa.toFixed(2)} GPA`;
+      } else {
+        calculationOutput.textContent =
+          "Enter credit hours greater than 0 for at least one class to see the calculation.";
+      }
+
+      notice.textContent = hasInvalidCredits
+        ? "Check credit hours: use a number greater than 0 and no more than 30. That row is not included until corrected."
+        : "";
+    }
+
+    // The buttons let the user add new classes or remove every class.
+    document.getElementById("addButton").addEventListener("click", () => addClass());
+
+    document.getElementById("clearButton").addEventListener("click", () => {
+      courseRows.innerHTML = "";
+      calculateGPA();
+    });
+
+    // Start with two editable example classes. Delete or edit them as needed.
+    addClass("English", "A", "3");
+    addClass("History", "B", "3");
+  </script>
+</body>
+</html>
